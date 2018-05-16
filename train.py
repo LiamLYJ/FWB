@@ -6,7 +6,7 @@ import tensorflow as tf
 from put_all import fwb_net
 import logging
 import numpy as np
-
+from tensorflow.examples.tutorials.mnist import input_data
 logging.getLogger().setLevel(logging.INFO)
 
 mnist = input_data.read_data_sets('MNIST_data', one_hot=False)
@@ -28,16 +28,90 @@ tf.app.flags.DEFINE_integer("num_glimpses", 6, "Number of glimpses.")
 tf.app.flags.DEFINE_float("variance", 0.22, "Gaussian variance for Location Network.")
 tf.app.flags.DEFINE_integer("M", 10, "Monte Carlo sampling, see Eq(2).")
 
+tf.app.flags.DEFINE_integer("img_size", 28, "image size")
+tf.app.flags.DEFINE_integer("img_channel", 3, "image channel")
+
 FLAGS = tf.app.flags.FLAGS
 
+training_steps_per_epoch = mnist.train.num_examples // FLAGS.batch_size
+
+ram = fwb_net(img_channel=FLAGS.img_channel,
+                              img_size=FLAGS.img_size,
+                              pth_size=FLAGS.patch_window_size,
+                              g_size=FLAGS.g_size,
+                              l_size=FLAGS.l_size,
+                              glimpse_output_size=FLAGS.glimpse_output_size,
+                              loc_dim=2,   # (x,y)
+                              variance=FLAGS.variance,
+                              cell_size=FLAGS.cell_size,
+                              num_glimpses=FLAGS.num_glimpses,
+                              num_classes=10,
+                              learning_rate=FLAGS.learning_rate,
+                              learning_rate_decay_factor=FLAGS.learning_rate_decay_factor,
+                              min_learning_rate=FLAGS.min_learning_rate,
+                              training_steps_per_epoch=training_steps_per_epoch,
+                              max_gradient_norm=FLAGS.max_gradient_norm,
+                              is_training=True)
+
+with tf.Session() as sess:
+  sess.run(tf.global_variables_initializer())
+  for step in range(FLAGS.num_steps):
+    images, labels = mnist.train.next_batch(FLAGS.batch_size)
+
+    images = np.tile(images, FLAGS.img_channel)
+
+    images = np.tile(images, [FLAGS.M, 1])
+    labels = np.tile(labels, [FLAGS.M])
+
+    output_feed = [ram.train_op, ram.loss, ram.xent, ram.reward, ram.advantage, ram.baselines_mse, ram.learning_rate]
+    _, loss, xent, reward, advantage, baselines_mse, learning_rate = sess.run(output_feed,
+                                                                        feed_dict={
+                                                                          ram.img_ph: images,
+                                                                          ram.lbl_ph: labels
+                                                                        })
+    if step and step % 100 == 0:
+      logging.info(
+        'step {}: lr = {:3.6f}\tloss = {:3.4f}\txent = {:3.4f}\treward = {:3.4f}\tadvantage = {:3.4f}\tbaselines_mse = {:3.4f}'.format(
+        step, learning_rate, loss, xent, reward, advantage, baselines_mse))
+
+    # Evaluation
+    if step and step % training_steps_per_epoch == 0:
+      for dataset in [mnist.validation, mnist.test]:
+        steps_per_epoch = dataset.num_examples // FLAGS.batch_size
+        correct_cnt = 0
+        num_samples = steps_per_epoch * FLAGS.batch_size
+        for test_step in range(steps_per_epoch):
+          images, labels = dataset.next_batch(FLAGS.batch_size)
+          labels_bak = labels
+          # Duplicate M times
+          images = np.tile(images, [FLAGS.M, 1])
+          labels = np.tile(labels, [FLAGS.M])
+          softmax = sess.run(ram.softmax,
+                                feed_dict={
+                                  ram.img_ph: images,
+                                  ram.lbl_ph: labels
+                                })
+          softmax = np.reshape(softmax, [FLAGS.M, -1, 10])
+          softmax = np.mean(softmax, 0)
+          prediction = np.argmax(softmax, 1).flatten()
+          correct_cnt += np.sum(prediction == labels_bak)
+        acc = correct_cnt / num_samples
+        if dataset == mnist.validation:
+          logging.info('valid accuracy = {}'.format(acc))
+        else:
+          logging.info('test accuracy = {}'.format(acc))
 
 
-def main(_):
-    run_config = tf.ConfigProto()
-    run_config.gpu_options.allow_growth=True
-    with tf.Session(config = run_config) as sess:
-        net = fwb_net(sess, flags = FLAGS)
-        net.train()
 
-if __name__ == '__main__':
-    tf.app.run()
+
+
+#
+# def main(_):
+#     run_config = tf.ConfigProto()
+#     run_config.gpu_options.allow_growth=True
+#     with tf.Session(config = run_config) as sess:
+#         net = fwb_net(sess, flags = FLAGS)
+#         net.train()
+#
+# if __name__ == '__main__':
+#     tf.app.run()

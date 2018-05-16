@@ -1,5 +1,22 @@
 import tensorflow as tf
 import numpy as np
+import tensorflow.contrib.slim as slim
+
+
+
+def leaky_relu(x):
+    return tf.where(tf.greater(x,0),x,0.2*x)
+
+def model_arg_scope(weight_decay=0.0005, ac_fn = tf.nn.relu):
+    with slim.arg_scope([slim.conv2d, slim.fully_connected],
+        activation_fn = ac_fn,
+        weights_regularizer= slim.l2_regularizer(weight_decay),
+        weights_initializer= tf.truncated_normal_initializer(stddev=0.01),
+        biases_initializer= tf.zeros_initializer(),
+        normalizer_fn = None):
+        with slim.arg_scope([slim.conv2d], padding ='SAME') as sc:
+            return sc
+
 
 
 def pdf_sample(pdf, uniform_noise):

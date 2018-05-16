@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as ly
-from util import lrelu
+from utils import lrelu
 
 
 def cnn(net, is_train, cfg):
