@@ -1,6 +1,44 @@
 import tensorflow as tf
+import math
 import numpy as np
 import tensorflow.contrib.slim as slim
+from tensorflow.python.ops.distributions.normal import Normal
+
+
+def weight_variable(shape):
+    initial = tf.truncated_normal(shape=shape, stddev=0.01)
+    return tf.Variable(initial)
+
+
+def bias_variable(shape):
+    initial = tf.constant(0.0, shape=shape)
+    return tf.Variable(initial)
+
+
+def log_likelihood(loc_means, locs, variance):
+    loc_means = tf.stack(loc_means)  # [timesteps, batch_sz, loc_dim]
+    locs = tf.stack(locs)
+    gaussian = Normal(loc_means, variance)
+    logll = gaussian._log_prob(x=locs)  # [timesteps, batch_sz, loc_dim]
+    logll = tf.reduce_sum(logll, 2)
+    return tf.transpose(logll)      # [batch_sz, timesteps]
+
+
+
+def get_angular_loss(vec1, vec2, length_regularization=0.0):
+    with tf.name_scope('angular_error'):
+        safe_v = 0.999999
+        assert len(vec1.get_shape()) == 2
+        illum_normalized = tf.nn.l2_normalize(vec1, 1)
+        _illum_normalized = tf.nn.l2_normalize(vec2, 1)
+        dot = tf.reduce_sum(illum_normalized * _illum_normalized, 1)
+        dot = tf.clip_by_value(dot, -safe_v, safe_v)
+        length_loss = tf.reduce_mean(
+            tf.maximum(tf.log(tf.reduce_sum(vec1**2, axis=1) + 1e-7), 0))
+
+        angle = tf.acos(dot) * (180 / math.pi)
+
+        return tf.reduce_mean(angle) + length_loss * length_regularization
 
 
 

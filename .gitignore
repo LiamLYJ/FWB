@@ -3,3 +3,5 @@ __pycache__/
 *.png
 *.jpg
 MNIST_data/
+data/
+log/
