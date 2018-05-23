@@ -8,6 +8,7 @@ from ram import *
 from agent import *
 from critic import *
 
+
 # contain three subpart : GlimpseNetwork, Agent, critic. Connected by RNN
 class fwb_net(object):
     def __init__(self, img_channel, img_size, pth_size, g_size, l_size, glimpse_output_size,
@@ -59,20 +60,63 @@ class fwb_net(object):
         locs, loc_means = [], []
         gains = []
         img_retouched = []
-        def loop_function(prev, _):
+    
+        def _apply_gain(ill, loc, img, patch_wise = False):
+            if patch_wise:
+                retina = RetinaSensor(img_channel, img_size, pth_size)
+                pth = retina(img, loc, serial = False)
+                img = tf.reshape(img, [
+                    tf.shape(img)[0],
+                    img_size,
+                    img_size,
+                    img_channel
+                ])
+                retouched_channel = []
+                for i in range(3):
+                    tmp = pth[:,:,:,i]
+                    tmp = tf.reshape(tmp, [tf.shape(tmp)[0], -1])
+                    tmp_ill = tf.reshape(ill[:,i]/ill[:,1],[tf.shape(img)[0], 1])
+                    tmp_ill = tf.tile(tmp_ill, [1, pth_size * pth_size])
+                    tmp *= tmp_ill 
+                    retouched_channel.append(tmp)
+                retouched = tf.concat(retouched_channel, -1)
+                img[:,
+                    round(img_size*loc[0]) - pth_size : round(img_size*loc[0]) + pth_size,
+                    round(img_size*loc[1]) - pth_size : round(img_size*loc[1]) + pth_size,
+                    :] = retouched             
+            else:
+                img = tf.reshape(img, [
+                    tf.shape(img)[0], img_size, img_size, img_channel ] )
+                retouched_channel = []
+                for i in range(3):
+                    tmp = img[:,:,:,i]
+                    tmp = tf.reshape(tmp, [tf.shape(tmp)[0], -1])
+                    tmp_ill = tf.reshape(ill[:,i] / ill[:,1],
+                                         [tf.shape(img)[0], 1] )
+                    tmp_ill = tf.tile(tmp_ill, [1, img_size * img_size])
+                    tmp *= tmp_ill
+                    retouched_channel.append(tmp)
+                img = tf.concat(retouched_channel, -1)
+            return img  
+
+        def _loop_function(prev, _):
             loc, loc_mean = location_network(prev)
             locs.append(loc)
             loc_means.append(loc_mean)
             gain = wb_network(prev)
             gains.append(gain)
-            # if img_retouched:
-            #     img_retouched.append(_apply_gain(gain, loc, img_retouched[-1])
-            # else:
-            #     img_retouched.append(_apply_gain(gain, loc, self.img_ph))
-            glimpse = glimpse_network(self.img_ph, loc)
+            if img_retouched:
+                img_retouched.append(_apply_gain(gain, loc, img_retouched[-1])
+                                     )
+                glimpse = glimpse_network(img_retouched[-1], loc)
+            else:
+                img_retouched.append(_apply_gain(gain, loc, self.img_ph))
+                glimpse = glimpse_network(self.img_ph, loc)
             return glimpse
+                
+
         rnn_outputs, _ = rnn_decoder(
-            rnn_inputs, init_state, cell, loop_function=loop_function)
+            rnn_inputs, init_state, cell, loop_function=_loop_function)
 
         assert len(gains) == len(locs)
         # Time independent baselines
@@ -126,6 +170,14 @@ class fwb_net(object):
             self.train_op = tf.train.AdamOptimizer(self.learning_rate).apply_gradients(
                 zip(clipped_gradients, params), global_step=self.global_step)
 
+            img = tf.reshape(self.img_ph, 
+                [ tf.shape(self.img_ph)[0],
+                img_size,
+                img_size,
+                img_channel] )
+            tf.summary.image('input', img)
+            tf.summary.image('gt', apply_gain(img, self.lbl_ph))
+            tf.summary.image('est', apply_gain(img, self.prediction))
             self.sum_total = tf.summary.merge_all()
 
         self.saver = tf.train.Saver(

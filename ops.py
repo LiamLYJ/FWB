@@ -4,6 +4,22 @@ import numpy as np
 import tensorflow.contrib.slim as slim
 from tensorflow.python.ops.distributions.normal import Normal
 
+FLAGS = tf.app.flags.FLAGS
+
+def apply_gain(img, ill):
+    # rgb, same order img and ill
+    after_apply = []
+    for i in range(3):
+        tmp = img[:,:,:,i]
+        tmp = tf.reshape(tmp, [tf.shape(tmp)[0], -1])
+        tmp_ill = tf.reshape(ill[:,i]/ill[:,1],[tf.shape(tmp)[0], 1])
+        tmp_ill = tf.tile(tmp_ill, [1, FLAGS.img_size * FLAGS.img_size])
+        one_channel = tmp_ill * tmp
+        output = tf.reshape(one_channel, [tf.shape(tmp)[0], FLAGS.img_size,
+                                          FLAGS.img_size, -1])
+        after_apply.append(output)
+    return tf.concat(after_apply, -1)
+
 
 def weight_variable(shape):
     initial = tf.truncated_normal(shape=shape, stddev=0.01)

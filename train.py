@@ -2,16 +2,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os 
+import sys
 import tensorflow as tf
+import cv2
 from put_all import fwb_net
 import logging
 import numpy as np
+import pickle
 from tensorflow.examples.tutorials.mnist import input_data
 from data_provider import *
+from utils import *
 
 logging.getLogger().setLevel(logging.INFO)
 
-AUGMENTATION = True
+AUGMENTATION = False
 # Rotation angle
 AUGMENTATION_ANGLE = 60
 # Patch scale
@@ -51,8 +56,10 @@ tf.app.flags.DEFINE_float("min_learning_rate", 1e-4, "Minimum learning rate.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 5.0,
                           "Clip gradients to this norm.")
 tf.app.flags.DEFINE_integer(
-    "batch_size", 32, "Batch size to use during training.")
+    "batch_size", 16, "Batch size to use during training.")
 tf.app.flags.DEFINE_integer("num_steps", 100000, "Number of training steps.")
+tf.app.flags.DEFINE_integer("save_steps", 1000, "Number of saving steps.")
+tf.app.flags.DEFINE_integer("test_steps", 20, "Number of test steps.")
 
 tf.app.flags.DEFINE_integer("patch_window_size", 8,
                             "Size of glimpse patch window.")
@@ -74,9 +81,16 @@ tf.app.flags.DEFINE_integer("fc1_size", 128, "final fc before the output of disc
 tf.app.flags.DEFINE_integer("base_channels", 32, "base channel of discriminator")
 
 tf.app.flags.DEFINE_string('summary_dir', './log', 'summary file dir')
+tf.app.flags.DEFINE_string('checkpoint_dir', './check_point', 'check point file dir')
+tf.app.flags.DEFINE_string('model_name', 'RNN', 'model name')
 
 TRAINING_FOLDS = ['s0']
 FLAGS = tf.app.flags.FLAGS
+
+if not os.path.exists(FLAGS.summary_dir):
+    os.mkdir(FLAGS.summary_dir)
+if not os.path.exists(FLAGS.checkpoint_dir):    
+    os.mkdir(FLAGS.checkpoint_dir)
 
 training_data_provider = DataProvider(True, TRAINING_FOLDS)
 training_data_provider.set_batch_size(FLAGS.batch_size)
@@ -110,10 +124,17 @@ with tf.Session() as sess:
     for step in range(FLAGS.num_steps):
         batch  = training_data_provider.get_batch()
         images, labels = batch[0], batch[2]
-
-        # images = np.tile(images, [FLAGS.M, 1])
-        # labels = np.tile(labels, [FLAGS.M])
+        # output from provider is BGR
+        images = images[:,:,:,::-1]
+        images = images / 65535.0
+        images = (np.power(images, 1/2.2)*255.0)[:,:,:,::-1]
+        images = images - np.array([104.0,
+                                            117.0,123.0]).reshape([1,1,1,3])
         images = np.reshape(images, (FLAGS.batch_size, -1))
+
+        images = np.tile(images, [FLAGS.M, 1])
+        labels = np.tile(labels, [FLAGS.M, 1])
+
         output_feed = [ram.train_op, ram.loss, ram.xent, ram.reward,
                        ram.advantage, ram.baselines_mse, ram.learning_rate, ram.sum_total]
         _, loss, xent, reward, advantage, baselines_mse, learning_rate, sum_total = \
@@ -128,6 +149,40 @@ with tf.Session() as sess:
             logging.info(
                 'step {}: lr = {:3.6f}\tloss = {:3.4f}\txent = {:3.4f}\treward = {:3.4f}\tadvantage = {:3.4f}\tbaselines_mse = {:3.4f}'.format(
                     step, learning_rate, loss, xent, reward, advantage, baselines_mse))
+
+        if step and step % FLAGS.save_steps == 0:
+            checkpoint_dir = FLAGS.checkpoint_dir
+            model_name = FLAGS.model_name
+            ram.saver.save(sess, os.path.join(checkpoint_dir, model_name), global_step = step)
+
+        if step % FLAGS.test_steps == 0:
+        # if step and step % FLAGS.test_steps == 0:
+            f = open('./data/sony/image_pack.0.pkl', 'br')
+            bb = pickle.load(f, encoding = "UFT-8")
+            gts = []
+            ests = []
+            errors = []
+            for i in range(len(bb)):
+                gt = bb[i].illum
+                gts.append(gt)
+                image = bb[i].img
+                image = image / 65535.0
+                image = cv2.resize(image, (FLAGS.img_size, FLAGS.img_size))
+                image = np.expand_dims(image, 0)
+                alex_image = (np.power(image, 1/2.2)*255.0)[:,:,:,::-1]
+                input_data = alex_image - np.array([104.0, 117.0,
+                                                     123.0]).reshape([1,1,1,3])
+
+                input_data = np.reshape(input_data, (1, -1))
+                est = sess.run(ram.prediction, feed_dict = {ram.img_ph :
+                                                   input_data})            
+                est = np.squeeze(est)
+                ests.append(est)
+                error = angular_error(gt, est)
+                errors.append(error)
+            print_angular_errors(errors)
+
+
 
         # # Evaluation
         # if step and step % training_steps_per_epoch == 0:

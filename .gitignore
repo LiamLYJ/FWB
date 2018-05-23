@@ -5,3 +5,4 @@ __pycache__/
 MNIST_data/
 data/
 log/
+*.swp

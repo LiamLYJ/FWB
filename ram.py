@@ -12,7 +12,7 @@ class RetinaSensor(object):
         self.pth_size = pth_size
         self.img_channel = img_channel
 
-    def __call__(self, img_ph, loc):
+    def __call__(self, img_ph, loc, serial = True):
         img = tf.reshape(img_ph, [
             tf.shape(img_ph)[0],
             self.img_size,
@@ -23,7 +23,10 @@ class RetinaSensor(object):
             img,
             [self.pth_size, self.pth_size],
             loc)
-        return tf.reshape(pth, [tf.shape(loc)[0], self.pth_size*self.pth_size*self.img_channel])
+        if serial:
+            return tf.reshape(pth, [tf.shape(loc)[0], self.pth_size*self.pth_size*self.img_channel])
+        else:
+            return pth
 
 
 class GlimpseNetwork(object):
