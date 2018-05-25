@@ -9,7 +9,7 @@ class CriticNetwork(object):
         self.fc1_size = fc1_size
         self.base_channels = base_channels
         # Input: float \in [0, 1]
-    def __call__(self, images, cfg, states=None, is_train=None, reuse=False):
+    def __call__(self, images, states=None, is_train=None, reuse=False):
         with tf.variable_scope('critic') as scope:
             if reuse:
                 scope.reuse_variables()
@@ -60,20 +60,20 @@ class CriticNetwork(object):
                     print('     States:', states.shape)
                     images = tf.concat([images, states], axis=3)
 
-                cnn_feature = cnn(images, cfg=cfg, is_train=is_train)
+                cnn_feature = self.cnn(images, is_train=is_train,
+                                       self.base_channels)
                 print('     CNN shape: ', cnn_feature.shape)
                 net = cnn_feature
 
             print('Before final FCs', net.shape)
-            net = ly.fully_connected(net, cfg.fc1_size, activation_fn=lrelu)
-            print('     ', net.shape)
+            net = ly.fully_connected(net, self.fc1_size, activation_fn=lrelu)
 
             outputs = ly.fully_connected(net, 1, activation_fn=None)
-        return outputs, None, None
+        return outputs 
 
-    def cnn(self, net, is_train, cfg):
+    def cnn(self, net, is_train, base_channels ):
         net = net - 0.5
-        channels = cfg.base_channels
+        channels = base_channels
         size = int(net.get_shape()[2])
         print('Critic CNN:')
         print('    ', str(net.get_shape()))

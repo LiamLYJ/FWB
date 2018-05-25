@@ -43,8 +43,8 @@ class fwb_net(object):
                     loc_dim=loc_dim, rnn_output_size=cell.output_size, variance=variance, is_sampling=is_training)
             with tf.variable_scope('WhiteBalanceNetwork'):
                 wb_network = WhiteBalanceNetwork(rnn_output_size = cell.output_size,output_dim=output_dim)
-        # with tf.variable_scope('Critic'):
-        #     critic_network = CriticNetwork(fc1_size, base_channels)
+        with tf.variable_scope('Critic'):
+            critic_network = CriticNetwork(fc1_size, base_channels)
 
 
         # Core Network

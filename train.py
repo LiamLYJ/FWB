@@ -183,35 +183,6 @@ with tf.Session() as sess:
             print_angular_errors(errors)
 
 
-
-        # # Evaluation
-        # if step and step % training_steps_per_epoch == 0:
-        #     for dataset in [mnist.validation, mnist.test]:
-        #         steps_per_epoch = dataset.num_examples // FLAGS.batch_size
-        #         correct_cnt = 0
-        #         num_samples = steps_per_epoch * FLAGS.batch_size
-        #         for test_step in range(steps_per_epoch):
-        #             images, labels = dataset.next_batch(FLAGS.batch_size)
-        #             labels_bak = labels
-        #             # Duplicate M times
-        #             images = np.tile(images, [FLAGS.M, 1])
-        #             labels = np.tile(labels, [FLAGS.M])
-        #             softmax = sess.run(ram.softmax,
-        #                                feed_dict={
-        #                                    ram.img_ph: images,
-        #                                    ram.lbl_ph: labels
-        #                                })
-        #             softmax = np.reshape(softmax, [FLAGS.M, -1, 10])
-        #             softmax = np.mean(softmax, 0)
-        #             prediction = np.argmax(softmax, 1).flatten()
-        #             correct_cnt += np.sum(prediction == labels_bak)
-        #         acc = correct_cnt / num_samples
-        #         if dataset == mnist.validation:
-        #             logging.info('valid accuracy = {}'.format(acc))
-        #         else:
-        #             logging.info('test accuracy = {}'.format(acc))
-
-
 #
 # def main(_):
 #     run_config = tf.ConfigProto()
