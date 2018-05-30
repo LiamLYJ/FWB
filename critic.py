@@ -43,7 +43,7 @@ class CriticNetwork(object):
                     ],
                     axis=1)
 
-                print('stats ', stat_feature.shape)
+                # print('stats ', stat_feature.shape)
 
                 if states is None:
                     states = stat_feature
@@ -54,29 +54,29 @@ class CriticNetwork(object):
 
             if True:
                 if states is not None:
-                    print('States:', states.shape)
+                    # print('States:', states.shape)
                     states = states[:, None, None, :] + \
                         (images[:, :, :, 0:1] * 0)
-                    print('     States:', states.shape)
+                    # print('     States:', states.shape)
                     images = tf.concat([images, states], axis=3)
 
                 cnn_feature = self.cnn(images, is_train=is_train,
-                                       self.base_channels)
-                print('     CNN shape: ', cnn_feature.shape)
+                                       base_channels = self.base_channels)
+                # print('     CNN shape: ', cnn_feature.shape)
                 net = cnn_feature
 
-            print('Before final FCs', net.shape)
+            # print('Before final FCs', net.shape)
             net = ly.fully_connected(net, self.fc1_size, activation_fn=lrelu)
 
             outputs = ly.fully_connected(net, 1, activation_fn=None)
-        return outputs 
+        return outputs
 
     def cnn(self, net, is_train, base_channels ):
         net = net - 0.5
         channels = base_channels
         size = int(net.get_shape()[2])
-        print('Critic CNN:')
-        print('    ', str(net.get_shape()))
+        # print('Critic CNN:')
+        # print('    ', str(net.get_shape()))
         size /= 2
         net = ly.conv2d(
             net,
@@ -85,7 +85,7 @@ class CriticNetwork(object):
             stride=2,
             activation_fn=lrelu,
             normalizer_fn=None)
-        print('    ', str(net.get_shape()))
+        # print('    ', str(net.get_shape()))
         while size > 4:
             channels *= 2
             size /= 2
@@ -101,6 +101,6 @@ class CriticNetwork(object):
                     'decay': 0.9,
                     'updates_collections': None
                 })
-            print('    ', str(net.get_shape()))
+            # print('    ', str(net.get_shape()))
         net = tf.reshape(net, [-1, 4 * 4 * channels])
         return net
