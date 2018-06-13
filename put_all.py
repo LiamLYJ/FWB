@@ -141,7 +141,7 @@ class fwb_net(object):
         logits = tf.nn.xw_plus_b(rnn_last_output, logit_w, logit_b)
         # batch_size *3
         self.prediction = tf.nn.l2_normalize(logits, axis=1)
-
+        self.locations = locs
         if is_training:
             # angular loss
             self.xent = get_angular_loss(self.prediction, self.lbl_ph)

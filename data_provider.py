@@ -178,7 +178,7 @@ class DataProvider:
             if self.is_training and FLAGS.AUGMENTATION:
                 ldr, illum = augment(ldr, illum)
             else:
-                ldr = ldr[:FCN_INPUT_SIZE, :FCN_INPUT_SIZE]
+                ldr = ldr[:FLAGS.img_size, :FLAGS.img_size]
             nrgb = None
             next_batch[0].append(ldr)
             next_batch[1].append(nrgb)
