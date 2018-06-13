@@ -120,6 +120,24 @@ def augment(ldr, illum):
     return crop(ldr, illum)
 
 
+def split(ldr, illum, ldr_, illum_):
+    is_row = random.choice([0,1])
+    h,w,c = ldr.shape
+    ldr_mix = ldr_.copy()
+    if is_row == 1:
+        rand_row = random.uniform(0.2,0.8)
+        end = round(w*rand_row)
+        y, x = 0,end 
+        ldr_mix[:,0:end,:] = ldr[:,0:end,:]
+    else:
+        rand_col = random.uniform(0.2,0.8)
+        end = round(h*rand_col)
+        y, x = end, 0
+        ldr_mix[0:end,:,:] = ldr[0:end,:,:]
+    illum_mix = [(y,x), illum, illum_]
+    return ldr_mix, illum_mix
+
+
 class DataProvider:
 
     def __init__(self, is_training, folds):
@@ -175,10 +193,18 @@ class DataProvider:
         for i in indices:
             ldr, nrgb = self.images[i], self.nrgbs[i]
             illum = self.illums[i]
-            if self.is_training and FLAGS.AUGMENTATION:
-                ldr, illum = augment(ldr, illum)
-            else:
-                ldr = ldr[:FLAGS.img_size, :FLAGS.img_size]
+            # random choise another sample for splition
+            i_ = random.choice(indices)
+            ldr_, nrgb_ = self.images[i_], self.nrgbs[i_]
+            illum_ = self.illums[i_]
+            ldr = cv2.resize(ldr, (FLAGS.img_size, FLAGS.img_size))
+            ldr_ = cv2.resize(ldr_, (FLAGS.img_size, FLAGS.img_size))
+            if self.is_training :
+                if FLAGS.AUGMENTATION:
+                    ldr, illum = augment(ldr, illum)
+                    ldr_, illum_ = augment(ldr_, illum_)
+                if FLAGS.SPLITION:
+                    ldr, illum = split(ldr, illum, ldr_, illum_)
             nrgb = None
             next_batch[0].append(ldr)
             next_batch[1].append(nrgb)

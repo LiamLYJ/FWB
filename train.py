@@ -16,9 +16,9 @@ from utils import *
 
 logging.getLogger().setLevel(logging.INFO)
 
-
+tf.app.flags.DEFINE_boolean('SPLITION', 'True', 'if use split for generating training data')
 tf.app.flags.DEFINE_boolean('DATA_SHUFFLE', 'True', 'if use data shuffle')
-tf.app.flags.DEFINE_boolean('AUGMENTATION', 'False', 'if use data augmentation')
+tf.app.flags.DEFINE_boolean('AUGMENTATION', 'True', 'if use data augmentation')
 tf.app.flags.DEFINE_float('AUGMENTATION_ANGLE', '60', 'augmentation angle')
 tf.app.flags.DEFINE_float('AUGMENTATION_SCALE_LOW',
                           '0.1', 'augmentation scale low bound')
